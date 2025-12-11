@@ -4,7 +4,7 @@
   "description": "GitHub Action to capture CPU and memory usage metrics",
   "main": "dist/main.js",
   "scripts": {
-    "build": "ncc build src/main.ts -o dist/main --source-map && ncc build src/post.ts -o dist/post --source-map && npm run move-dist",
+    "build": "ncc build src/main.ts -o dist/main && ncc build src/post.ts -o dist/post && npm run move-dist",
     "move-dist": "mv dist/main/index.js dist/main.js && mv dist/post/index.js dist/post.js && rm -rf dist/main dist/post",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/"
