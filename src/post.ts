@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { DefaultArtifactClient } from '@actions/artifact';
 import { MetricSample, MetricsOutput, MetricsSummary, MonitorState } from './types';
+import { generateCombinedChart } from './charts';
 
 async function run(): Promise<void> {
   try {
@@ -73,7 +74,7 @@ async function run(): Promise<void> {
     const artifactName = core.getInput('artifact_name');
 
     if (outputFormat === 'summary' || outputFormat === 'both') {
-      writeSummary(summary);
+      writeSummary(summary, samples);
     }
 
     // Upload artifact if requested
@@ -148,9 +149,13 @@ function calculateSummary(samples: MetricSample[]): MetricsSummary {
   };
 }
 
-function writeSummary(summary: MetricsSummary): void {
+function writeSummary(summary: MetricsSummary, samples: MetricSample[]): void {
+  const chart = generateCombinedChart(samples);
+
   const summaryContent = `
 ## Workflow Telemetry
+
+${chart}
 
 | Metric | Peak | Average |
 |--------|------|---------|
