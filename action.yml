@@ -1,0 +1,39 @@
+name: 'Workflow Telemetry'
+description: 'Captures CPU and memory usage metrics during workflow execution'
+author: 'quiquecmtt'
+
+branding:
+  icon: 'activity'
+  color: 'blue'
+
+inputs:
+  sampling_interval:
+    description: 'Interval in seconds between metric samples'
+    required: false
+    default: '1'
+  output_format:
+    description: 'Output format: summary, json, or both'
+    required: false
+    default: 'summary'
+  artifact_name:
+    description: 'Name for the metrics artifact (if empty, no artifact is uploaded)'
+    required: false
+    default: ''
+
+outputs:
+  peak_cpu:
+    description: 'Peak CPU usage percentage'
+  peak_memory:
+    description: 'Peak memory usage percentage'
+  avg_cpu:
+    description: 'Average CPU usage percentage'
+  avg_memory:
+    description: 'Average memory usage percentage'
+  metrics_file:
+    description: 'Path to the metrics JSON file'
+
+runs:
+  using: 'node20'
+  main: 'dist/main.js'
+  post: 'dist/post.js'
+  post-if: 'always()'
