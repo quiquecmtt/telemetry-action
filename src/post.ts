@@ -151,13 +151,11 @@ function calculateSummary(samples: MetricSample[]): MetricsSummary {
 
 function writeSummary(summary: MetricsSummary, samples: MetricSample[]): void {
   const chart = generateCombinedChart(samples);
-  const chartBase64 = Buffer.from(chart).toString('base64');
-  const chartImg = `<img src="data:image/svg+xml;base64,${chartBase64}" alt="CPU and Memory Usage Chart" width="700" />`;
 
   const summaryContent = `
 ## Workflow Telemetry
 
-${chartImg}
+${chart}
 
 | Metric | Peak | Average |
 |--------|------|---------|

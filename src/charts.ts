@@ -134,7 +134,7 @@ export function generateMemoryChart(samples: MetricSample[]): string {
 
 export function generateCombinedChart(samples: MetricSample[]): string {
   if (samples.length === 0) {
-    return createEmptyChart(defaultOptions);
+    return '<p><em>No telemetry data collected</em></p>';
   }
 
   const width = 700;
@@ -159,49 +159,33 @@ export function generateCombinedChart(samples: MetricSample[]): string {
   const cpuPoints = toPoints(cpuData);
   const memPoints = toPoints(memData);
 
+  const fontStyle = 'font-family: system-ui, -apple-system, sans-serif';
+
   // Grid lines
   const gridLines: string[] = [];
   for (let i = 0; i <= 5; i++) {
     const y = padding + (i / 5) * chartHeight;
     const value = 100 - i * 20;
     gridLines.push(
-      `<line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}" stroke="#e5e7eb" stroke-dasharray="4,4" />`
+      `<line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}" stroke="#e5e7eb" stroke-dasharray="4,4"/>`
     );
     gridLines.push(
-      `<text x="${padding - 10}" y="${y + 4}" text-anchor="end" fill="#374151" font-size="11">${value}%</text>`
+      `<text x="${padding - 10}" y="${y + 4}" text-anchor="end" fill="#374151" font-size="11" style="${fontStyle}">${value}%</text>`
     );
   }
 
-  return `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
-  <style>
-    .chart-title { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-weight: 600; }
-    text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-  </style>
-
-  <!-- Background -->
-  <rect width="${width}" height="${height}" fill="white" rx="8" />
-
-  <!-- Title -->
-  <text x="${width / 2}" y="25" text-anchor="middle" fill="#374151" font-size="14" class="chart-title">CPU &amp; Memory Usage Over Time</text>
-
-  <!-- Grid -->
-  ${gridLines.join('\n  ')}
-
-  <!-- CPU Line -->
-  <polyline points="${cpuPoints.join(' ')}" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-
-  <!-- Memory Line -->
-  <polyline points="${memPoints.join(' ')}" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-
-  <!-- Legend -->
-  <rect x="${width - 140}" y="10" width="12" height="12" fill="#2563eb" rx="2" />
-  <text x="${width - 122}" y="20" fill="#374151" font-size="11">CPU</text>
-  <rect x="${width - 80}" y="10" width="12" height="12" fill="#16a34a" rx="2" />
-  <text x="${width - 62}" y="20" fill="#374151" font-size="11">Memory</text>
-
-  <!-- Time labels -->
-  <text x="${padding}" y="${height - 10}" text-anchor="start" fill="#374151" font-size="11">Start</text>
-  <text x="${width / 2}" y="${height - 10}" text-anchor="middle" fill="#374151" font-size="11">Time</text>
-  <text x="${width - padding}" y="${height - 10}" text-anchor="end" fill="#374151" font-size="11">End</text>
+  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+<rect width="${width}" height="${height}" fill="white" rx="8"/>
+<text x="${width / 2}" y="25" text-anchor="middle" fill="#374151" font-size="14" font-weight="600" style="${fontStyle}">CPU and Memory Usage Over Time</text>
+${gridLines.join('\n')}
+<polyline points="${cpuPoints.join(' ')}" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="${memPoints.join(' ')}" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="${width - 140}" y="10" width="12" height="12" fill="#2563eb" rx="2"/>
+<text x="${width - 122}" y="20" fill="#374151" font-size="11" style="${fontStyle}">CPU</text>
+<rect x="${width - 80}" y="10" width="12" height="12" fill="#16a34a" rx="2"/>
+<text x="${width - 62}" y="20" fill="#374151" font-size="11" style="${fontStyle}">Memory</text>
+<text x="${padding}" y="${height - 10}" text-anchor="start" fill="#374151" font-size="11" style="${fontStyle}">Start</text>
+<text x="${width / 2}" y="${height - 10}" text-anchor="middle" fill="#374151" font-size="11" style="${fontStyle}">Time</text>
+<text x="${width - padding}" y="${height - 10}" text-anchor="end" fill="#374151" font-size="11" style="${fontStyle}">End</text>
 </svg>`;
 }
