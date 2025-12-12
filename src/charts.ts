@@ -76,7 +76,7 @@ function toAsciiChart(data: number[], label: string, maxVal = 100, height = 8): 
   return lines;
 }
 
-export function generateCombinedChart(samples: MetricSample[]): string {
+export function generateCombinedChart(samples: MetricSample[], chartHeight = 10): string {
   if (samples.length === 0) {
     return '*No telemetry data collected*';
   }
@@ -84,24 +84,14 @@ export function generateCombinedChart(samples: MetricSample[]): string {
   const cpuData = samples.map((s) => s.cpu_percent);
   const memData = samples.map((s) => s.memory_percent);
 
-  const cpuSparkline = toSparkline(cpuData);
-  const memSparkline = toSparkline(memData);
-
-  const cpuMin = Math.min(...cpuData).toFixed(1);
-  const cpuMax = Math.max(...cpuData).toFixed(1);
-  const cpuAvg = (cpuData.reduce((a, b) => a + b, 0) / cpuData.length).toFixed(1);
-
-  const memMin = Math.min(...memData).toFixed(1);
-  const memMax = Math.max(...memData).toFixed(1);
-  const memAvg = (memData.reduce((a, b) => a + b, 0) / memData.length).toFixed(1);
+  const cpuChart = toAsciiChart(cpuData, 'CPU Usage', 100, chartHeight);
+  const memChart = toAsciiChart(memData, 'Memory Usage', 100, chartHeight);
 
   return `
 \`\`\`
-CPU Usage (min: ${cpuMin}% | avg: ${cpuAvg}% | max: ${cpuMax}%)
-${cpuSparkline}
+${cpuChart.join('\n')}
 
-Memory Usage (min: ${memMin}% | avg: ${memAvg}% | max: ${memMax}%)
-${memSparkline}
+${memChart.join('\n')}
 \`\`\`
 `.trim();
 }
