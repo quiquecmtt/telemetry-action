@@ -1,0 +1,162 @@
+name: Test Telemetry Action
+
+on:
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test-cpu-stress:
+    name: Test CPU Stress
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start Telemetry
+        uses: ./
+        with:
+          sampling_interval: "1"
+          output_format: "both"
+          artifact_name: "cpu-stress-metrics"
+
+      - name: Stress CPU (4 cores for 30s)
+        run: |
+          echo "Starting CPU stress test..."
+          # Use dd and md5sum to generate CPU load on multiple cores
+          for i in {1..4}; do
+            dd if=/dev/urandom bs=1M count=1024 2>/dev/null | md5sum > /dev/null &
+          done
+          # Wait for background jobs
+          sleep 30
+          echo "CPU stress test complete"
+
+  test-memory-stress:
+    name: Test Memory Stress
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start Telemetry
+        uses: ./
+        with:
+          sampling_interval: "1"
+          output_format: "both"
+          artifact_name: "memory-stress-metrics"
+
+      - name: Stress Memory (allocate ~2GB)
+        run: |
+          echo "Starting memory stress test..."
+          # Use Python to allocate memory
+          python3 << 'EOF'
+          import time
+
+          # Allocate ~2GB of memory
+          print("Allocating memory...")
+          data = []
+          for i in range(20):
+              # Each chunk is ~100MB
+              chunk = bytearray(100 * 1024 * 1024)
+              data.append(chunk)
+              print(f"Allocated {(i+1) * 100}MB")
+              time.sleep(1)
+
+          print("Holding memory for 10 seconds...")
+          time.sleep(10)
+          print("Memory stress test complete")
+          EOF
+
+  test-mixed-workload:
+    name: Test Mixed Workload
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start Telemetry
+        uses: ./
+        with:
+          sampling_interval: "1"
+          output_format: "both"
+          artifact_name: "mixed-workload-metrics"
+
+      - name: Run mixed CPU and Memory workload
+        run: |
+          echo "Starting mixed workload test..."
+
+          # Phase 1: CPU spike
+          echo "Phase 1: CPU spike (10s)"
+          for i in {1..2}; do
+            dd if=/dev/urandom bs=1M count=512 2>/dev/null | md5sum > /dev/null &
+          done
+          sleep 10
+
+          # Phase 2: Memory allocation
+          echo "Phase 2: Memory allocation"
+          python3 -c "
+          import time
+          data = [bytearray(50 * 1024 * 1024) for _ in range(10)]  # 500MB
+          print('Allocated 500MB')
+          time.sleep(10)
+          "
+
+          # Phase 3: Combined
+          echo "Phase 3: Combined CPU + Memory"
+          python3 << 'EOF' &
+          import time
+          data = [bytearray(100 * 1024 * 1024) for _ in range(5)]  # 500MB
+          time.sleep(15)
+          EOF
+
+          for i in {1..2}; do
+            dd if=/dev/urandom bs=1M count=512 2>/dev/null | md5sum > /dev/null &
+          done
+          sleep 15
+
+          echo "Mixed workload test complete"
+
+  test-multiplatform:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start Telemetry
+        uses: ./
+        with:
+          sampling_interval: "2"
+          output_format: "both"
+          artifact_name: "metrics-${{ matrix.os }}"
+
+      - name: Run workload (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          echo "Running workload on ${{ matrix.os }}..."
+          # Simple CPU work
+          for i in {1..3}; do
+            dd if=/dev/urandom bs=1M count=256 2>/dev/null | md5sum > /dev/null &
+          done
+          sleep 20
+          echo "Done"
+
+      - name: Run workload (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "Running workload on Windows..."
+          # CPU work using PowerShell
+          $jobs = @()
+          for ($i = 0; $i -lt 3; $i++) {
+              $jobs += Start-Job -ScriptBlock {
+                  $data = new-object byte[] 104857600  # 100MB
+                  (new-object Random).NextBytes($data)
+                  [System.Security.Cryptography.MD5]::Create().ComputeHash($data)
+              }
+          }
+          Start-Sleep -Seconds 20
+          $jobs | Stop-Job
+          Write-Host "Done"
