@@ -1,9 +1,29 @@
 import * as core from '@actions/core';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { DefaultArtifactClient } from '@actions/artifact';
 import { MetricSample, MetricsOutput, MetricsSummary, MonitorState } from './types';
 import { generateCombinedChart } from './charts';
+
+interface SystemInfo {
+  cpuCores: number;
+  cpuModel: string;
+  totalMemoryMb: number;
+  platform: string;
+  arch: string;
+}
+
+function getSystemInfo(): SystemInfo {
+  const cpus = os.cpus();
+  return {
+    cpuCores: cpus.length,
+    cpuModel: cpus[0]?.model || 'Unknown',
+    totalMemoryMb: Math.round(os.totalmem() / 1024 / 1024),
+    platform: os.platform(),
+    arch: os.arch(),
+  };
+}
 
 async function run(): Promise<void> {
   try {
@@ -151,10 +171,20 @@ function calculateSummary(samples: MetricSample[]): MetricsSummary {
 
 function writeSummary(summary: MetricsSummary, samples: MetricSample[]): void {
   const chart = generateCombinedChart(samples);
+  const sysInfo = getSystemInfo();
+  const totalMemoryGb = (sysInfo.totalMemoryMb / 1024).toFixed(1);
 
   const summaryContent = `
 ## Workflow Telemetry
 
+### System Information
+| Resource | Value |
+|----------|-------|
+| CPU | ${sysInfo.cpuCores} cores (${sysInfo.cpuModel.trim()}) |
+| Memory | ${totalMemoryGb} GB |
+| Platform | ${sysInfo.platform} (${sysInfo.arch}) |
+
+### Resource Usage
 ${chart}
 
 | Metric | Peak | Average |
