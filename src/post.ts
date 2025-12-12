@@ -59,7 +59,7 @@ async function run(): Promise<void> {
     const output: MetricsOutput = { summary, samples };
 
     // Save full metrics to JSON file
-    const metricsFile = path.join(state.metricsDir, 'metrics.json');
+    const metricsFile = path.join(state.metricsDir, `${artifactName}-metrics.json`);
     fs.writeFileSync(metricsFile, JSON.stringify(output, null, 2));
 
     // Set outputs
