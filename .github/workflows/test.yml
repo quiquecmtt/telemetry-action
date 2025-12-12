@@ -61,8 +61,8 @@ jobs:
           print("Full CPU test complete!")
           EOF
 
-  test-full-memory:
-    name: Test Full Memory Usage
+  test-80-memory:
+    name: Test 80% Memory Usage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,11 +72,11 @@ jobs:
         with:
           sampling_interval: "1"
           output_format: "both"
-          artifact_name: "full-memory-metrics"
+          artifact_name: "80-memory-metrics"
 
       - name: Allocate maximum memory
         run: |
-          echo "Starting full memory test..."
+          echo "Starting 80% memory test..."
 
           python3 << 'EOF'
           import os
@@ -169,10 +169,10 @@ jobs:
               print(f"CPU: {cores} cores active")
               procs = start_cpu_workers(cores, 8)
 
-              # Also ramp memory: add 1000MB each step
-              chunk = bytearray(1000 * 1024 * 1024)
+              # Also ramp memory: add 2000MB each step
+              chunk = bytearray(2000 * 1024 * 1024)
               memory_chunks.append(chunk)
-              print(f"Memory: {len(memory_chunks) * 1000}MB allocated")
+              print(f"Memory: {len(memory_chunks) * 2}GB allocated")
 
               for p in procs:
                   p.join()
@@ -192,7 +192,7 @@ jobs:
               # Release memory
               if memory_chunks:
                   memory_chunks.pop()
-                  print(f"Memory: {len(memory_chunks) * 1000}MB allocated")
+                  print(f"Memory: {len(memory_chunks) * 2}GB allocated")
 
               for p in procs:
                   p.join()
@@ -200,7 +200,7 @@ jobs:
           print("=== Phase 4: Idle ===")
           memory_chunks.clear()
           print("All resources released, idling for 5s...")
-          time.sleep(5)
+          time.sleep(10)
 
           print("Ramp test complete!")
           EOF
