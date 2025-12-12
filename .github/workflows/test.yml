@@ -115,6 +115,88 @@ jobs:
 
           echo "Mixed workload test complete"
 
+  test-ramp:
+    name: Test Ramp Up/Down
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start Telemetry
+        uses: ./
+        with:
+          sampling_interval: "1"
+          output_format: "both"
+          artifact_name: "ramp-metrics"
+
+      - name: Ramp CPU and Memory
+        run: |
+          echo "Starting ramp test..."
+
+          python3 << 'EOF'
+          import multiprocessing
+          import time
+          import os
+
+          def cpu_worker(duration):
+              """Burn CPU for duration seconds"""
+              end = time.time() + duration
+              while time.time() < end:
+                  _ = sum(i*i for i in range(10000))
+
+          def start_cpu_workers(n, duration):
+              """Start n CPU workers"""
+              procs = []
+              for _ in range(n):
+                  p = multiprocessing.Process(target=cpu_worker, args=(duration,))
+                  p.start()
+                  procs.append(p)
+              return procs
+
+          # Memory storage
+          memory_chunks = []
+
+          print("=== Phase 1: Ramp UP ===")
+          # Ramp up CPU: 1 -> 2 -> 3 -> 4 cores
+          for cores in [1, 2, 3, 4]:
+              print(f"CPU: {cores} cores active")
+              procs = start_cpu_workers(cores, 8)
+
+              # Also ramp memory: add 200MB each step
+              chunk = bytearray(200 * 1024 * 1024)
+              memory_chunks.append(chunk)
+              print(f"Memory: {len(memory_chunks) * 200}MB allocated")
+
+              for p in procs:
+                  p.join()
+
+          print("=== Phase 2: Peak (hold) ===")
+          print("Holding peak load for 10s...")
+          procs = start_cpu_workers(4, 10)
+          for p in procs:
+              p.join()
+
+          print("=== Phase 3: Ramp DOWN ===")
+          # Ramp down CPU and release memory
+          for cores in [3, 2, 1]:
+              print(f"CPU: {cores} cores active")
+              procs = start_cpu_workers(cores, 5)
+
+              # Release memory
+              if memory_chunks:
+                  memory_chunks.pop()
+                  print(f"Memory: {len(memory_chunks) * 200}MB allocated")
+
+              for p in procs:
+                  p.join()
+
+          print("=== Phase 4: Idle ===")
+          memory_chunks.clear()
+          print("All resources released, idling for 5s...")
+          time.sleep(5)
+
+          print("Ramp test complete!")
+          EOF
+
   test-multiplatform:
     name: Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
