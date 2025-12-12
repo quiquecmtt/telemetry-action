@@ -76,11 +76,37 @@ async function run(): Promise<void> {
 
     // Calculate statistics
     const summary = calculateSummary(samples);
-    const output: MetricsOutput = { summary, samples };
+    const sysInfo = getSystemInfo();
 
-    // Save full metrics to JSON file
-    const metricsFile = path.join(state.metricsDir, 'metrics.json');
-    fs.writeFileSync(metricsFile, JSON.stringify(output, null, 2));
+    // Generate output based on format
+    const outputFormat = core.getInput('output_format') || 'summary';
+    const artifactName = core.getInput('artifact_name');
+
+    // Use artifact name for file prefix, or default to 'metrics'
+    const filePrefix = artifactName || 'metrics';
+
+    // Save summary to JSON file (without samples)
+    const jsonOutput = {
+      summary,
+      system: {
+        cpu_cores: sysInfo.cpuCores,
+        cpu_model: sysInfo.cpuModel.trim(),
+        total_memory_mb: sysInfo.totalMemoryMb,
+        platform: sysInfo.platform,
+        arch: sysInfo.arch,
+      },
+    };
+    const metricsFile = path.join(state.metricsDir, `${filePrefix}.json`);
+    fs.writeFileSync(metricsFile, JSON.stringify(jsonOutput, null, 2));
+
+    // Save samples to CSV file
+    const csvHeader = 'timestamp,cpu_percent,memory_used_mb,memory_total_mb,memory_percent';
+    const csvRows = samples.map(
+      (s) => `${s.timestamp},${s.cpu_percent},${s.memory_used_mb},${s.memory_total_mb},${s.memory_percent}`
+    );
+    const csvContent = [csvHeader, ...csvRows].join('\n');
+    const csvFile = path.join(state.metricsDir, `${filePrefix}.csv`);
+    fs.writeFileSync(csvFile, csvContent);
 
     // Set outputs
     core.setOutput('peak_cpu', summary.peak_cpu_percent.toString());
@@ -88,10 +114,6 @@ async function run(): Promise<void> {
     core.setOutput('avg_cpu', summary.avg_cpu_percent.toString());
     core.setOutput('avg_memory', summary.avg_memory_percent.toString());
     core.setOutput('metrics_file', metricsFile);
-
-    // Generate output based on format
-    const outputFormat = core.getInput('output_format') || 'summary';
-    const artifactName = core.getInput('artifact_name');
 
     if (outputFormat === 'summary' || outputFormat === 'both') {
       writeSummary(summary, samples);
@@ -101,10 +123,12 @@ async function run(): Promise<void> {
     if (artifactName) {
       try {
         const artifact = new DefaultArtifactClient();
-        await artifact.uploadArtifact(artifactName, [metricsFile], state.metricsDir, {
+        await artifact.uploadArtifact(artifactName, [metricsFile, csvFile], state.metricsDir, {
           retentionDays: 30,
         });
         core.info(`Uploaded metrics artifact: ${artifactName}`);
+        core.info(`  - ${filePrefix}.json (summary + system info)`);
+        core.info(`  - ${filePrefix}.csv (${samples.length} samples)`);
       } catch (error) {
         core.warning(`Failed to upload artifact: ${error}`);
       }

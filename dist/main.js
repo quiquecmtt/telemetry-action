@@ -25711,6 +25711,19 @@ const interval = ${parseInt(samplingInterval, 10) * 1000};
 const metricsDir = '${metricsDir.replace(/\\/g, '\\\\')}';
 const filePath = path.join(metricsDir, 'raw_metrics.jsonl');
 
+// Store previous CPU stats for delta calculation
+let prevCpuStats = null;
+
+function parseCpuStats() {
+  const stat = fs.readFileSync('/proc/stat', 'utf8');
+  const cpuLine = stat.split('\\n').find(line => line.startsWith('cpu '));
+  if (!cpuLine) return null;
+  const parts = cpuLine.split(/\\s+/).slice(1).map(Number);
+  const idle = parts[3] + (parts[4] || 0); // idle + iowait
+  const total = parts.reduce((a, b) => a + b, 0);
+  return { idle, total };
+}
+
 function getCpuUsage() {
   const platform = os.platform();
   try {
@@ -25722,14 +25735,22 @@ function getCpuUsage() {
       const sys = sysMatch ? parseFloat(sysMatch[1]) : 0;
       return Math.round((user + sys) * 10) / 10;
     } else if (platform === 'linux') {
-      const stat = fs.readFileSync('/proc/stat', 'utf8');
-      const cpuLine = stat.split('\\n').find(line => line.startsWith('cpu '));
-      if (cpuLine) {
-        const parts = cpuLine.split(/\\s+/).slice(1).map(Number);
-        const total = parts.reduce((a, b) => a + b, 0);
-        const idle = parts[3] || 0;
-        return Math.round(((total - idle) / total) * 1000) / 10;
+      const currentStats = parseCpuStats();
+      if (!currentStats) return 0;
+
+      if (prevCpuStats) {
+        const idleDelta = currentStats.idle - prevCpuStats.idle;
+        const totalDelta = currentStats.total - prevCpuStats.total;
+        prevCpuStats = currentStats;
+
+        if (totalDelta > 0) {
+          const usage = ((totalDelta - idleDelta) / totalDelta) * 100;
+          return Math.round(usage * 10) / 10;
+        }
       }
+
+      prevCpuStats = currentStats;
+      return 0; // First reading, no delta yet
     } else if (platform === 'win32') {
       const output = execSync('wmic cpu get loadpercentage /value 2>nul', { encoding: 'utf8', timeout: 5000 });
       const match = output.match(/LoadPercentage=(\\d+)/);
