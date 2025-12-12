@@ -49,8 +49,8 @@ jobs:
               print(f"Started worker {i+1}/{cpu_count}")
 
           # Let it run for 30 seconds
-          print("Running at 100% CPU for 30 seconds...")
-          time.sleep(30)
+          print("Running at 100% CPU for 60 seconds...")
+          time.sleep(60)
 
           # Terminate all workers
           print("Stopping workers...")
@@ -113,8 +113,8 @@ jobs:
               print("Hit memory limit!")
 
           print(f"Final allocation: {allocated / (1024**3):.1f} GB")
-          print("Holding memory for 20 seconds...")
-          time.sleep(20)
+          print("Holding memory for 60 seconds...")
+          time.sleep(60)
 
           print("Releasing memory...")
           chunks.clear()
