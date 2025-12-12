@@ -6,7 +6,9 @@ A GitHub Action that captures CPU and memory usage metrics during workflow execu
 
 - Monitors CPU and memory usage at configurable intervals
 - Works on Linux, macOS, and Windows runners
-- Outputs metrics to job summary, JSON artifacts, or both
+- **ASCII charts** for visual resource usage over time in job summary
+- **System information** reporting (CPU cores/model, memory, platform)
+- Outputs metrics to job summary, JSON/CSV artifacts, or both
 - Provides peak and average statistics
 - Uses post-job hook to automatically collect metrics after all steps complete
 
@@ -49,6 +51,7 @@ jobs:
     sampling_interval: '2'
     output_format: 'both'
     artifact_name: 'build-metrics'
+    # Uploads: build-metrics.json (summary) and build-metrics.csv (samples)
 ```
 
 ### Using Outputs
@@ -80,8 +83,9 @@ jobs:
 4. After **all** workflow steps complete, the action's `post` hook:
    - Stops the monitoring process
    - Calculates statistics (peak, average)
-   - Generates output (summary table, JSON file)
-   - Optionally uploads metrics as an artifact
+   - Generates ASCII charts for visualization
+   - Outputs summary with system info to job summary
+   - Optionally uploads JSON summary and CSV samples as artifacts
 
 ## Inputs
 
@@ -107,16 +111,49 @@ jobs:
 
 ### Summary (Job Summary)
 
-When `output_format` is `summary` or `both`, a table is added to the GitHub Actions job summary:
+When `output_format` is `summary` or `both`, a detailed summary is added to the GitHub Actions job summary including:
+
+- **System Information**: CPU cores, model, total memory, and platform
+- **ASCII Charts**: Visual representation of CPU and memory usage over time
+- **Statistics Table**: Peak and average values for CPU and memory
+
+Example output:
+
+```
+## Workflow Telemetry
+
+### System Information
+| Resource | Value |
+|----------|-------|
+| CPU | 4 cores (Intel Xeon E5-2673 v4) |
+| Memory | 16.0 GB |
+| Platform | linux (x64) |
+
+### Resource Usage
+100% │                    █                              │
+     │                    █                              │
+     │                   ██                              │
+     │                   ██                              │
+     │                  ███                              │
+     │                  ███ █                            │
+     │          █      ████ █                            │
+     │         ██      █████ █                           │
+     │        ███     ██████ ██                          │
+  0% │▄▄▄▄▄▄▄████▄▄▄▄▄███████████▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄│
+     └──────────────────────────────────────────────────┘
+                          CPU Usage
 
 | Metric | Peak | Average |
 |--------|------|---------|
 | CPU Usage | 85.2% | 45.3% |
 | Memory Usage | 72.1% | 58.4% |
+```
 
-### JSON (Artifact)
+### Artifact Files
 
-When `artifact_name` is set, a JSON file is uploaded as an artifact:
+When `artifact_name` is set, two files are uploaded as an artifact:
+
+**1. `{artifact_name}.json`** - Summary and system information:
 
 ```json
 {
@@ -129,16 +166,23 @@ When `artifact_name` is set, a JSON file is uploaded as an artifact:
     "start_time": "2024-01-15T10:30:00.000Z",
     "end_time": "2024-01-15T10:32:00.000Z"
   },
-  "samples": [
-    {
-      "timestamp": "2024-01-15T10:30:00.000Z",
-      "cpu_percent": 25.5,
-      "memory_used_mb": 2048,
-      "memory_total_mb": 7168,
-      "memory_percent": 28.6
-    }
-  ]
+  "system": {
+    "cpu_cores": 4,
+    "cpu_model": "Intel Xeon E5-2673 v4",
+    "total_memory_mb": 16384,
+    "platform": "linux",
+    "arch": "x64"
+  }
 }
+```
+
+**2. `{artifact_name}.csv`** - Raw samples for further analysis:
+
+```csv
+timestamp,cpu_percent,memory_used_mb,memory_total_mb,memory_percent
+2024-01-15T10:30:00.000Z,25.5,2048,7168,28.6
+2024-01-15T10:30:01.000Z,32.1,2100,7168,29.3
+...
 ```
 
 ## Platform Support
