@@ -169,17 +169,17 @@ jobs:
               print(f"CPU: {cores} cores active")
               procs = start_cpu_workers(cores, 8)
 
-              # Also ramp memory: add 200MB each step
-              chunk = bytearray(200 * 1024 * 1024)
+              # Also ramp memory: add 1000MB each step
+              chunk = bytearray(1000 * 1024 * 1024)
               memory_chunks.append(chunk)
-              print(f"Memory: {len(memory_chunks) * 200}MB allocated")
+              print(f"Memory: {len(memory_chunks) * 1000}MB allocated")
 
               for p in procs:
                   p.join()
 
           print("=== Phase 2: Peak (hold) ===")
-          print("Holding peak load for 10s...")
-          procs = start_cpu_workers(4, 10)
+          print("Holding peak load for 20s...")
+          procs = start_cpu_workers(4, 20)
           for p in procs:
               p.join()
 
@@ -192,7 +192,7 @@ jobs:
               # Release memory
               if memory_chunks:
                   memory_chunks.pop()
-                  print(f"Memory: {len(memory_chunks) * 200}MB allocated")
+                  print(f"Memory: {len(memory_chunks) * 1000}MB allocated")
 
               for p in procs:
                   p.join()
@@ -233,8 +233,8 @@ jobs:
           echo "Phase 2: Memory allocation"
           python3 -c "
           import time
-          data = [bytearray(50 * 1024 * 1024) for _ in range(10)]  # 500MB
-          print('Allocated 500MB')
+          data = [bytearray(500 * 1024 * 1024) for _ in range(10)]  # 5GB
+          print('Allocated 5GB')
           time.sleep(10)
           "
 
@@ -242,7 +242,7 @@ jobs:
           echo "Phase 3: Combined CPU + Memory"
           python3 << 'EOF' &
           import time
-          data = [bytearray(100 * 1024 * 1024) for _ in range(5)]  # 500MB
+          data = [bytearray(1000 * 1024 * 1024) for _ in range(5)]  # 5GB
           time.sleep(15)
           EOF
 
