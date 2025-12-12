@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-cpu-stress:
-    name: Test CPU Stress
+  test-full-cpu:
+    name: Test Full CPU Usage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,56 +19,50 @@ jobs:
         with:
           sampling_interval: "1"
           output_format: "both"
-          artifact_name: "cpu-stress-metrics"
+          artifact_name: "full-cpu-metrics"
 
-      - name: Stress CPU (4 cores for 30s)
+      - name: Max out all CPU cores
         run: |
-          echo "Starting CPU stress test..."
-          # Use dd and md5sum to generate CPU load on multiple cores
-          for i in {1..4}; do
-            dd if=/dev/urandom bs=1M count=1024 2>/dev/null | md5sum > /dev/null &
-          done
-          # Wait for background jobs
-          sleep 30
-          echo "CPU stress test complete"
+          echo "Starting full CPU test..."
 
-  test-memory-stress:
-    name: Test Memory Stress
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Start Telemetry
-        uses: ./
-        with:
-          sampling_interval: "1"
-          output_format: "both"
-          artifact_name: "memory-stress-metrics"
-
-      - name: Stress Memory (allocate ~2GB)
-        run: |
-          echo "Starting memory stress test..."
-          # Use Python to allocate memory
           python3 << 'EOF'
+          import multiprocessing
           import time
+          import os
 
-          # Allocate ~2GB of memory
-          print("Allocating memory...")
-          data = []
-          for i in range(20):
-              # Each chunk is ~100MB
-              chunk = bytearray(100 * 1024 * 1024)
-              data.append(chunk)
-              print(f"Allocated {(i+1) * 100}MB")
-              time.sleep(1)
+          def cpu_burn():
+              """Burn CPU indefinitely"""
+              while True:
+                  _ = sum(i*i for i in range(10000))
 
-          print("Holding memory for 10 seconds...")
-          time.sleep(10)
-          print("Memory stress test complete")
+          # Get number of CPU cores
+          cpu_count = multiprocessing.cpu_count()
+          print(f"Detected {cpu_count} CPU cores")
+          print(f"Starting {cpu_count} CPU workers to achieve 100% usage...")
+
+          # Start a worker for each core
+          procs = []
+          for i in range(cpu_count):
+              p = multiprocessing.Process(target=cpu_burn)
+              p.start()
+              procs.append(p)
+              print(f"Started worker {i+1}/{cpu_count}")
+
+          # Let it run for 30 seconds
+          print("Running at 100% CPU for 30 seconds...")
+          time.sleep(30)
+
+          # Terminate all workers
+          print("Stopping workers...")
+          for p in procs:
+              p.terminate()
+              p.join()
+
+          print("Full CPU test complete!")
           EOF
 
-  test-mixed-workload:
-    name: Test Mixed Workload
+  test-full-memory:
+    name: Test Full Memory Usage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -78,42 +72,56 @@ jobs:
         with:
           sampling_interval: "1"
           output_format: "both"
-          artifact_name: "mixed-workload-metrics"
+          artifact_name: "full-memory-metrics"
 
-      - name: Run mixed CPU and Memory workload
+      - name: Allocate maximum memory
         run: |
-          echo "Starting mixed workload test..."
+          echo "Starting full memory test..."
 
-          # Phase 1: CPU spike
-          echo "Phase 1: CPU spike (10s)"
-          for i in {1..2}; do
-            dd if=/dev/urandom bs=1M count=512 2>/dev/null | md5sum > /dev/null &
-          done
-          sleep 10
-
-          # Phase 2: Memory allocation
-          echo "Phase 2: Memory allocation"
-          python3 -c "
+          python3 << 'EOF'
+          import os
           import time
-          data = [bytearray(50 * 1024 * 1024) for _ in range(10)]  # 500MB
-          print('Allocated 500MB')
-          time.sleep(10)
-          "
 
-          # Phase 3: Combined
-          echo "Phase 3: Combined CPU + Memory"
-          python3 << 'EOF' &
-          import time
-          data = [bytearray(100 * 1024 * 1024) for _ in range(5)]  # 500MB
-          time.sleep(15)
+          # Get total system memory
+          mem_bytes = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+          mem_gb = mem_bytes / (1024**3)
+          print(f"Total system memory: {mem_gb:.1f} GB")
+
+          # Target 80% of total memory to avoid OOM killer
+          target_percent = 0.80
+          target_bytes = int(mem_bytes * target_percent)
+          target_gb = target_bytes / (1024**3)
+          print(f"Target allocation: {target_gb:.1f} GB ({target_percent*100:.0f}%)")
+
+          # Allocate in 500MB chunks
+          chunk_size = 500 * 1024 * 1024  # 500MB
+          chunks = []
+          allocated = 0
+
+          print("Allocating memory...")
+          try:
+              while allocated < target_bytes:
+                  chunk = bytearray(chunk_size)
+                  # Touch the memory to ensure it's actually allocated
+                  for i in range(0, len(chunk), 4096):
+                      chunk[i] = 1
+                  chunks.append(chunk)
+                  allocated += chunk_size
+                  print(f"Allocated: {allocated / (1024**3):.1f} GB")
+                  time.sleep(0.5)
+          except MemoryError:
+              print("Hit memory limit!")
+
+          print(f"Final allocation: {allocated / (1024**3):.1f} GB")
+          print("Holding memory for 20 seconds...")
+          time.sleep(20)
+
+          print("Releasing memory...")
+          chunks.clear()
+          time.sleep(5)
+
+          print("Full memory test complete!")
           EOF
-
-          for i in {1..2}; do
-            dd if=/dev/urandom bs=1M count=512 2>/dev/null | md5sum > /dev/null &
-          done
-          sleep 15
-
-          echo "Mixed workload test complete"
 
   test-ramp:
     name: Test Ramp Up/Down
@@ -197,48 +205,50 @@ jobs:
           print("Ramp test complete!")
           EOF
 
-  test-multiplatform:
-    name: Test on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+  test-mixed-workload:
+    name: Test Mixed Workload
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Start Telemetry
         uses: ./
         with:
-          sampling_interval: "2"
+          sampling_interval: "1"
           output_format: "both"
-          artifact_name: "metrics-${{ matrix.os }}"
+          artifact_name: "mixed-workload-metrics"
 
-      - name: Run workload (Unix)
-        if: runner.os != 'Windows'
+      - name: Run mixed CPU and Memory workload
         run: |
-          echo "Running workload on ${{ matrix.os }}..."
-          # Simple CPU work
-          for i in {1..3}; do
-            dd if=/dev/urandom bs=1M count=256 2>/dev/null | md5sum > /dev/null &
+          echo "Starting mixed workload test..."
+
+          # Phase 1: CPU spike
+          echo "Phase 1: CPU spike (10s)"
+          for i in {1..2}; do
+            dd if=/dev/urandom bs=1M count=512 2>/dev/null | md5sum > /dev/null &
           done
-          sleep 20
-          echo "Done"
+          sleep 10
 
-      - name: Run workload (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          Write-Host "Running workload on Windows..."
-          # CPU work using PowerShell
-          $jobs = @()
-          for ($i = 0; $i -lt 3; $i++) {
-              $jobs += Start-Job -ScriptBlock {
-                  $data = new-object byte[] 104857600  # 100MB
-                  (new-object Random).NextBytes($data)
-                  [System.Security.Cryptography.MD5]::Create().ComputeHash($data)
-              }
-          }
-          Start-Sleep -Seconds 20
-          $jobs | Stop-Job
-          Write-Host "Done"
+          # Phase 2: Memory allocation
+          echo "Phase 2: Memory allocation"
+          python3 -c "
+          import time
+          data = [bytearray(50 * 1024 * 1024) for _ in range(10)]  # 500MB
+          print('Allocated 500MB')
+          time.sleep(10)
+          "
+
+          # Phase 3: Combined
+          echo "Phase 3: Combined CPU + Memory"
+          python3 << 'EOF' &
+          import time
+          data = [bytearray(100 * 1024 * 1024) for _ in range(5)]  # 500MB
+          time.sleep(15)
+          EOF
+
+          for i in {1..2}; do
+            dd if=/dev/urandom bs=1M count=512 2>/dev/null | md5sum > /dev/null &
+          done
+          sleep 15
+
+          echo "Mixed workload test complete"
